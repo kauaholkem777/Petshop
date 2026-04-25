@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PetShop Pro Master - Edição Total</title>
+    <title>PetShop Pro Master - Edição Sincronizada</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root {
@@ -21,7 +21,6 @@
 
         body { 
             background: var(--bg); 
-            /* FUNDO PERSONALIZADO COM ÍCONES DE PETS */
             background-image: 
                 radial-gradient(circle at 2px 2px, rgba(56, 189, 248, 0.05) 1px, transparent 0),
                 url('https://www.transparenttextures.com/patterns/paws.png');
@@ -88,12 +87,15 @@
         .btn { width: 100%; padding: 18px; border-radius: 15px; border: none; font-weight: 900; cursor: pointer; margin-top: 15px; text-transform: uppercase; }
         .btn-primary { background: var(--primary); color: #000; }
         .btn-danger { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
         .btn-muted { background: #334155; color: white; }
 
         .hidden { display: none !important; }
         #reader { width: 100%; border-radius: 25px; overflow: hidden; background: #000; border: 3px solid var(--primary); margin-top: 10px; }
         .preview-img-box { width: 140px; height: 140px; border-radius: 25px; border: 3px dashed var(--primary); margin: 15px auto; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0f172a; cursor: pointer; }
         .preview-img-box img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .sync-area { background: rgba(56, 189, 248, 0.05); padding: 15px; border-radius: 20px; border: 1px dashed var(--primary); margin: 15px 0; }
     </style>
 </head>
 <body>
@@ -122,10 +124,23 @@
 
 <div id="viewSettings" class="container hidden">
     <button onclick="showScreen('home')" class="btn btn-muted">⬅ VOLTAR PARA A LOJA</button>
+    
     <div class="stat-card" style="margin-top:25px">
+        <h3 style="color:var(--primary); margin:0">Sincronizar entre Celulares</h3>
+        <div class="sync-area">
+            <button class="btn btn-primary" onclick="exportData()">📤 Exportar Dados (Backup)</button>
+            <p style="font-size: 10px; color: #94a3b8; text-align: center; margin-top: 5px;">Baixa um arquivo para enviar ao outro celular via WhatsApp.</p>
+            <hr style="border:0; border-top: 1px solid #334155; margin: 15px 0;">
+            <button class="btn btn-success" onclick="document.getElementById('importFile').click()">📥 Importar Dados do Outro Celular</button>
+            <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(this)">
+        </div>
+    </div>
+
+    <div class="stat-card">
         <h2 style="color:var(--primary); margin:0 0 10px 0">PAINEL ADMINISTRATIVO</h2>
         <button onclick="showScreen('reports')" class="btn btn-primary">VER RELATÓRIOS E ESTATÍSTICAS</button>
     </div>
+    
     <div class="stat-card">
         <h3 style="color:var(--primary); margin-top:0">CONFIGURAÇÕES DA LOJA</h3>
         <label>Nome da Empresa</label>
@@ -228,10 +243,10 @@ let db = {
     tab: 'sacaria'
 };
 
-function save(){ localStorage.setItem("petshop_master_v14_final", JSON.stringify(db)); }
+function save(){ localStorage.setItem("petshop_master_v15", JSON.stringify(db)); }
 
 function load(){
-    const data = JSON.parse(localStorage.getItem("petshop_master_v14_final"));
+    const data = JSON.parse(localStorage.getItem("petshop_master_v15"));
     if(data) db = data;
     document.getElementById('shopTitle').innerText = db.config.name;
     document.getElementById('cfgName').value = db.config.name;
@@ -239,448 +254,29 @@ function load(){
     switchTab(db.tab);
 }
 
-function switchTab(t){
-    db.tab = t;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('active');
-    render();
+// SINCRONIZAÇÃO
+function exportData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", "backup_petshop.json");
+    dlAnchorElem.click();
 }
 
-function render(){
-    const list = document.getElementById('itemList');
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    list.innerHTML = "";
-    
-    const filtered = db.items.filter(i => {
-        const matchesTab = i.tipo === db.tab;
-        const matchesSearch = i.nome.toLowerCase().includes(search) || (i.code && i.code.toLowerCase().includes(search));
-        return matchesTab && matchesSearch;
-    });
-
-    filtered.forEach((item) => {
-        const idx = db.items.indexOf(item);
-        const preco = item.tipo === 'sacaria' ? item.precoSaco : item.precoKg;
-        list.innerHTML += `<div class="card" onclick="openModal(${idx})"><div class="info"><img src="${item.img || ''}" class="prod-img"><div><b>${item.nome}</b><small>Cód: ${item.code || '---'} | Est: ${item.estoque}</small></div></div><div class="price-tag"><span class="price-val">R$ ${parseFloat(preco).toFixed(2)}</span></div></div>`;
-    });
-}
-
-function showScreen(id){
-    ['viewHome', 'viewSettings', 'viewReports', 'mainTabs', 'fabAdd'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    if(id === 'home') { ['viewHome','mainTabs','fabAdd'].forEach(s => document.getElementById(s).classList.remove('hidden')); render(); }
-    else if(id === 'settings') document.getElementById('viewSettings').classList.remove('hidden');
-    else if(id === 'reports') { document.getElementById('viewReports').classList.remove('hidden'); renderReports(); }
-}
-
-function renderReports(){
-    const statsBox = document.getElementById('statsVisual');
-    const lowBox = document.getElementById('lowStockList');
-    let total = db.items.reduce((acc, i) => acc + ( (i.tipo === 'sacaria' ? i.precoSaco : i.precoKg) * i.estoque ), 0);
-    document.getElementById('totalCapital').innerText = `R$ ${total.toFixed(2)}`;
-    
-    const sorted = [...db.items].sort((a,b) => b.estoque - a.estoque).slice(0, 3);
-    const maxVal = sorted[0]?.estoque || 1;
-    statsBox.innerHTML = sorted.map(i => `<div><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; margin-top:10px"><span>${i.nome}</span><span>${i.estoque} Un/Kg</span></div><div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${(i.estoque/maxVal)*100}%"></div></div></div>`).join('');
-    
-    const low = db.items.filter(i => i.estoque <= 3);
-    lowBox.innerHTML = low.length ? "" : "<p>Estoque OK.</p>";
-    low.forEach(i => { lowBox.innerHTML += `<div class="card" style="border-color:var(--danger)"><span>${i.nome}</span> <b>${i.estoque} RESTANTES</b></div>`; });
-}
-
-let scanner;
-function startScanner(target) {
-    document.getElementById('scanOverlay').classList.remove('hidden');
-    scanner = new Html5Qrcode("reader");
-    scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (txt) => {
-        if(target === 'search') { document.getElementById('searchInput').value = txt; render(); }
-        else { document.getElementById('inCode').value = txt; }
-        stopScanner();
-    }).catch(() => stopScanner());
-}
-
-function stopScanner(){
-    if(scanner) { scanner.stop().then(() => document.getElementById('scanOverlay').classList.add('hidden')).catch(() => document.getElementById('scanOverlay').classList.add('hidden')); }
-    else { document.getElementById('scanOverlay').classList.add('hidden'); }
-}
-
-function previewProdImg(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => document.getElementById('imgPrev').src = e.target.result;
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function updateShopLogo(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => { db.config.logo = e.target.result; document.getElementById('mainLogo').src = e.target.result; save(); };
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function openModal(idx = null){
-    const item = idx !== null ? db.items[idx] : { nome:"", precoSaco:"", peso:"", precoKg:"", estoque:"", code:"", tipo: db.tab, img:"" };
-    document.getElementById('inNome').value = item.nome;
-    document.getElementById('inPrecoSaco').value = item.precoSaco;
-    document.getElementById('inPeso').value = item.peso;
-    document.getElementById('inPrecoKg').value = item.precoKg;
-    document.getElementById('inEstoque').value = item.estoque;
-    document.getElementById('inCode').value = item.code || "";
-    document.getElementById('imgPrev').src = item.img || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E";
-    
-    document.getElementById('boxSacaria').classList.toggle('hidden', db.tab !== 'sacaria');
-    document.getElementById('boxGranel').classList.toggle('hidden', db.tab !== 'granel');
-    document.getElementById('modalItem').classList.remove('hidden');
-
-    document.getElementById('btnConfirm').onclick = () => {
-        const n = { tipo: db.tab, nome: document.getElementById('inNome').value.toUpperCase(), precoSaco: Number(document.getElementById('inPrecoSaco').value), peso: Number(document.getElementById('inPeso').value), precoKg: Number(document.getElementById('inPrecoKg').value), estoque: Number(document.getElementById('inEstoque').value), code: document.getElementById('inCode').value, img: document.getElementById('imgPrev').src };
-        if(idx !== null) db.items[idx] = n; else db.items.push(n);
-        save(); render(); closeM();
+function importData(input) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if(confirm("Substituir todos os dados por este backup?")) {
+                db = imported;
+                save();
+                location.reload();
+            }
+        } catch(err) { alert("Arquivo inválido!"); }
     };
-}
-
-function closeM(){ document.getElementById('modalItem').classList.add('hidden'); }
-function saveCfg(){ db.config.name = document.getElementById('cfgName').value.toUpperCase(); save(); showScreen('home'); }
-function openResetModal(){ document.getElementById('modalReset').classList.remove('hidden'); }
-function confirmReset(){ if(document.getElementById('inResetConfirm').value === "APAGAR TUDO") { localStorage.clear(); location.reload(); } }
-
-load();
-</script>
-</body>
-</html>
-    </div>
-    <h3 style="color:var(--danger); margin-top:30px">🚨 ESTOQUE BAIXO</h3>
-    <div id="lowStockList"></div>
-</div>
-
-<div id="modalItem" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h2 id="mTitle" style="text-align:center; color:var(--primary); margin-top:0">Produto</h2>
-        <div class="preview-img-box" onclick="document.getElementById('inImg').click()">
-            <img id="imgPrev" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
-        </div>
-        <input type="file" id="inImg" class="hidden" accept="image/*" onchange="previewProdImg(this)">
-
-        <label>Nome do Produto</label>
-        <input id="inNome" placeholder="Ex: RAÇÃO GOLDEN GATOS 10KG">
-
-        <div id="boxSacaria">
-            <div style="display:flex; gap:12px">
-                <div style="flex:1">
-                    <label>Preço Saco (R$)</label>
-                    <input id="inPrecoSaco" type="number" step="0.01">
-                </div>
-                <div style="flex:1">
-                    <label>Peso (KG)</label>
-                    <input id="inPeso" type="number">
-                </div>
-            </div>
-        </div>
-
-        <div id="boxGranel" class="hidden">
-            <label>Preço por Quilo (R$)</label>
-            <input id="inPrecoKg" type="number" step="0.01">
-        </div>
-
-        <label>Código de Barras / ID Rápido</label>
-        <div style="display:flex; gap:10px">
-            <input id="inCode" style="flex:1" placeholder="Ex: 27 ou 1010">
-            <button onclick="startScanner('input')" class="btn-icon">📷</button>
-        </div>
-
-        <label>Quantidade em Estoque</label>
-        <input id="inEstoque" type="number">
-
-        <div style="display:flex; gap:12px; margin-top:30px">
-            <button class="btn btn-muted" onclick="closeM()" style="flex:1">CANCELAR</button>
-            <button id="btnConfirm" class="btn btn-primary" style="flex:1">SALVAR</button>
-        </div>
-    </div>
-</div>
-
-<div id="scanOverlay" class="modal-overlay hidden">
-    <div class="modal-content" style="text-align:center">
-        <h2>ESCANEANDO...</h2>
-        <div id="reader"></div>
-        <button class="btn btn-danger" onclick="stopScanner()">❌ CANCELAR</button>
-    </div>
-</div>
-
-<div id="modalReset" class="modal-overlay hidden">
-    <div class="modal-content" style="border-color: var(--danger);">
-        <h2 style="color:var(--danger); text-align:center;">APAGAR TUDO?</h2>
-        <input id="inResetConfirm" placeholder="Digite: APAGAR TUDO" style="text-align:center;">
-        <div style="display:flex; gap:12px; margin-top:25px">
-            <button class="btn btn-muted" style="flex:1" onclick="document.getElementById('modalReset').classList.add('hidden')">VOLTAR</button>
-            <button class="btn btn-danger" style="flex:1" onclick="confirmReset()">APAGAR</button>
-        </div>
-    </div>
-</div>
-
-<button id="fabAdd" class="fab" onclick="openModal()">+</button>
-
-<script>
-let db = {
-    items: [
-        { tipo: 'sacaria', nome: 'GOLDEN GATOS CAST. 10.1KG', precoSaco: 159.90, peso: 10.1, estoque: 12, code: '27', img: 'https://images.tcdn.com.br/img/img_prod/703632/racao_golden_gatos_castrados_frango_10_1kg_1899_1_20201015152857.jpg' },
-        { tipo: 'sacaria', nome: 'PREMIER CÃES ADULTOS 15KG', precoSaco: 239.90, peso: 15, estoque: 3, code: '2039', img: 'https://images.petz.com.br/fotos/1659987978007.jpg' },
-        { tipo: 'granel', nome: 'BIFINHO CARNE (KG)', precoKg: 48.00, estoque: 25, code: '1010', img: 'https://images.petz.com.br/fotos/1632766348399.jpg' }
-    ],
-    config: { name: "PETSHOP PRO MASTER", logo: "" },
-    tab: 'sacaria'
-};
-
-function save(){ localStorage.setItem("petshop_master_v14_final", JSON.stringify(db)); }
-
-function load(){
-    const data = JSON.parse(localStorage.getItem("petshop_master_v14_final"));
-    if(data) db = data;
-    document.getElementById('shopTitle').innerText = db.config.name;
-    document.getElementById('cfgName').value = db.config.name;
-    if(db.config.logo) document.getElementById('mainLogo').src = db.config.logo;
-    switchTab(db.tab);
-}
-
-function switchTab(t){
-    db.tab = t;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('active');
-    render();
-}
-
-function render(){
-    const list = document.getElementById('itemList');
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    list.innerHTML = "";
-    
-    const filtered = db.items.filter(i => {
-        const matchesTab = i.tipo === db.tab;
-        const matchesSearch = i.nome.toLowerCase().includes(search) || (i.code && i.code.toLowerCase().includes(search));
-        return matchesTab && matchesSearch;
-    });
-
-    filtered.forEach((item) => {
-        const idx = db.items.indexOf(item);
-        const preco = item.tipo === 'sacaria' ? item.precoSaco : item.precoKg;
-        list.innerHTML += `<div class="card" onclick="openModal(${idx})"><div class="info"><img src="${item.img || ''}" class="prod-img"><div><b>${item.nome}</b><small>Cód: ${item.code || '---'} | Est: ${item.estoque}</small></div></div><div class="price-tag"><span class="price-val">R$ ${parseFloat(preco).toFixed(2)}</span></div></div>`;
-    });
-}
-
-function showScreen(id){
-    ['viewHome', 'viewSettings', 'viewReports', 'mainTabs', 'fabAdd'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    if(id === 'home') { ['viewHome','mainTabs','fabAdd'].forEach(s => document.getElementById(s).classList.remove('hidden')); render(); }
-    else if(id === 'settings') document.getElementById('viewSettings').classList.remove('hidden');
-    else if(id === 'reports') { document.getElementById('viewReports').classList.remove('hidden'); renderReports(); }
-}
-
-function renderReports(){
-    const statsBox = document.getElementById('statsVisual');
-    const lowBox = document.getElementById('lowStockList');
-    let total = db.items.reduce((acc, i) => acc + ( (i.tipo === 'sacaria' ? i.precoSaco : i.precoKg) * i.estoque ), 0);
-    document.getElementById('totalCapital').innerText = `R$ ${total.toFixed(2)}`;
-    
-    const sorted = [...db.items].sort((a,b) => b.estoque - a.estoque).slice(0, 3);
-    const maxVal = sorted[0]?.estoque || 1;
-    statsBox.innerHTML = sorted.map(i => `<div><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; margin-top:10px"><span>${i.nome}</span><span>${i.estoque} Un/Kg</span></div><div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${(i.estoque/maxVal)*100}%"></div></div></div>`).join('');
-    
-    const low = db.items.filter(i => i.estoque <= 3);
-    lowBox.innerHTML = low.length ? "" : "<p>Estoque OK.</p>";
-    low.forEach(i => { lowBox.innerHTML += `<div class="card" style="border-color:var(--danger)"><span>${i.nome}</span> <b>${i.estoque} RESTANTES</b></div>`; });
-}
-
-let scanner;
-function startScanner(target) {
-    document.getElementById('scanOverlay').classList.remove('hidden');
-    scanner = new Html5Qrcode("reader");
-    scanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (txt) => {
-        if(target === 'search') { document.getElementById('searchInput').value = txt; render(); }
-        else { document.getElementById('inCode').value = txt; }
-        stopScanner();
-    }).catch(() => stopScanner());
-}
-
-function stopScanner(){
-    if(scanner) { scanner.stop().then(() => document.getElementById('scanOverlay').classList.add('hidden')).catch(() => document.getElementById('scanOverlay').classList.add('hidden')); }
-    else { document.getElementById('scanOverlay').classList.add('hidden'); }
-}
-
-function previewProdImg(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => document.getElementById('imgPrev').src = e.target.result;
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function updateShopLogo(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => { db.config.logo = e.target.result; document.getElementById('mainLogo').src = e.target.result; save(); };
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function openModal(idx = null){
-    const item = idx !== null ? db.items[idx] : { nome:"", precoSaco:"", peso:"", precoKg:"", estoque:"", code:"", tipo: db.tab, img:"" };
-    document.getElementById('inNome').value = item.nome;
-    document.getElementById('inPrecoSaco').value = item.precoSaco;
-    document.getElementById('inPeso').value = item.peso;
-    document.getElementById('inPrecoKg').value = item.precoKg;
-    document.getElementById('inEstoque').value = item.estoque;
-    document.getElementById('inCode').value = item.code || "";
-    document.getElementById('imgPrev').src = item.img || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E";
-    
-    document.getElementById('boxSacaria').classList.toggle('hidden', db.tab !== 'sacaria');
-    document.getElementById('boxGranel').classList.toggle('hidden', db.tab !== 'granel');
-    document.getElementById('modalItem').classList.remove('hidden');
-
-    document.getElementById('btnConfirm').onclick = () => {
-        const n = { tipo: db.tab, nome: document.getElementById('inNome').value.toUpperCase(), precoSaco: Number(document.getElementById('inPrecoSaco').value), peso: Number(document.getElementById('inPeso').value), precoKg: Number(document.getElementById('inPrecoKg').value), estoque: Number(document.getElementById('inEstoque').value), code: document.getElementById('inCode').value, img: document.getElementById('imgPrev').src };
-        if(idx !== null) db.items[idx] = n; else db.items.push(n);
-        save(); render(); closeM();
-    };
-}
-
-function closeM(){ document.getElementById('modalItem').classList.add('hidden'); }
-function saveCfg(){ db.config.name = document.getElementById('cfgName').value.toUpperCase(); save(); showScreen('home'); }
-function openResetModal(){ document.getElementById('modalReset').classList.remove('hidden'); }
-function confirmReset(){ if(document.getElementById('inResetConfirm').value === "APAGAR TUDO") { localStorage.clear(); location.reload(); } }
-
-load();
-</script>
-</body>
-</html>
-    <div class="tabs" id="mainTabs">
-        <button id="tabSacaria" class="tab-btn active" onclick="switchTab('sacaria')">ESTOQUE SACARIA</button>
-        <button id="tabGranel" class="tab-btn" onclick="switchTab('granel')">VENDA GRANEL</button>
-    </div>
-</div>
-
-<div id="viewHome" class="container">
-    <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Nome ou Código (ex: 1010)..." onkeyup="render()">
-        <button id="camSearchBtn" class="btn-icon" onclick="startScanner('search')">📷</button>
-    </div>
-    <div id="itemList"></div>
-</div>
-
-<div id="viewSettings" class="container hidden">
-    <button onclick="showScreen('home')" class="btn btn-muted">⬅ VOLTAR PARA A LOJA</button>
-    <div class="stat-card" style="margin-top:25px">
-        <h2 style="color:var(--primary); margin:0 0 10px 0">PAINEL ADMINISTRATIVO</h2>
-        <button onclick="showScreen('reports')" class="btn btn-primary">VER RELATÓRIOS E ESTATÍSTICAS</button>
-    </div>
-    <div class="stat-card">
-        <h3 style="color:var(--primary); margin-top:0">CONFIGURAÇÕES DA LOJA</h3>
-        <label>Nome da Empresa</label>
-        <input type="text" id="cfgName">
-        <label>Logo da Empresa</label>
-        <input type="file" accept="image/*" onchange="updateShopLogo(this)" style="padding:10px">
-        <button class="btn btn-primary" onclick="saveCfg()" style="margin-top:20px">SALVAR ALTERAÇÕES</button>
-    </div>
-    <button class="btn btn-danger" onclick="openResetModal()" style="margin-top:40px">⚠️ RESETAR TODOS OS DADOS</button>
-</div>
-
-<div id="viewReports" class="container hidden">
-    <button onclick="showScreen('settings')" class="btn btn-muted">⬅ VOLTAR</button>
-    <div class="stat-card" style="margin-top:25px; border-left: 10px solid var(--success);">
-        <small style="color:var(--success); font-weight:bold;">CAPITAL TOTAL INVESTIDO</small>
-        <h1 id="totalCapital" style="font-size: 42px; margin: 10px 0;">R$ 0,00</h1>
-    </div>
-    <div class="stat-card">
-        <h3 style="color:var(--primary); margin-top:0">📊 TOP 3 - MAIOR VOLUME</h3>
-        <div id="statsVisual"></div>
-    </div>
-    <h3 style="color:var(--danger); margin-top:30px">🚨 ESTOQUE BAIXO</h3>
-    <div id="lowStockList"></div>
-</div>
-
-<div id="modalItem" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h2 id="mTitle" style="text-align:center; color:var(--primary); margin-top:0">Produto</h2>
-        <div class="preview-img-box" onclick="document.getElementById('inImg').click()">
-            <img id="imgPrev" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
-        </div>
-        <input type="file" id="inImg" class="hidden" accept="image/*" onchange="previewProdImg(this)">
-
-        <label>Nome do Produto</label>
-        <input id="inNome" placeholder="Ex: RAÇÃO GOLDEN GATOS 10KG">
-
-        <div id="boxSacaria">
-            <div style="display:flex; gap:12px">
-                <div style="flex:1">
-                    <label>Preço Saco (R$)</label>
-                    <input id="inPrecoSaco" type="number" step="0.01">
-                </div>
-                <div style="flex:1">
-                    <label>Peso (KG)</label>
-                    <input id="inPeso" type="number">
-                </div>
-            </div>
-        </div>
-
-        <div id="boxGranel" class="hidden">
-            <label>Preço por Quilo (R$)</label>
-            <input id="inPrecoKg" type="number" step="0.01">
-        </div>
-
-        <label>Código de Barras / ID Rápido</label>
-        <div style="display:flex; gap:10px">
-            <input id="inCode" style="flex:1" placeholder="Ex: 27 ou 1010">
-            <button onclick="startScanner('input')" class="btn-icon">📷</button>
-        </div>
-
-        <label>Quantidade em Estoque</label>
-        <input id="inEstoque" type="number">
-
-        <div style="display:flex; gap:12px; margin-top:30px">
-            <button class="btn btn-muted" onclick="closeM()" style="flex:1">CANCELAR</button>
-            <button id="btnConfirm" class="btn btn-primary" style="flex:1">SALVAR</button>
-        </div>
-    </div>
-</div>
-
-<div id="scanOverlay" class="modal-overlay hidden">
-    <div class="modal-content" style="text-align:center">
-        <h2>ESCANEANDO...</h2>
-        <div id="reader"></div>
-        <button class="btn btn-danger" onclick="stopScanner()">❌ CANCELAR</button>
-    </div>
-</div>
-
-<div id="modalReset" class="modal-overlay hidden">
-    <div class="modal-content" style="border-color: var(--danger);">
-        <h2 style="color:var(--danger); text-align:center;">APAGAR TUDO?</h2>
-        <input id="inResetConfirm" placeholder="Digite: APAGAR TUDO" style="text-align:center;">
-        <div style="display:flex; gap:12px; margin-top:25px">
-            <button class="btn btn-muted" style="flex:1" onclick="document.getElementById('modalReset').classList.add('hidden')">VOLTAR</button>
-            <button class="btn btn-danger" style="flex:1" onclick="confirmReset()">APAGAR</button>
-        </div>
-    </div>
-</div>
-
-<button id="fabAdd" class="fab" onclick="openModal()">+</button>
-
-<script>
-let db = {
-    items: [
-        { tipo: 'sacaria', nome: 'GOLDEN GATOS CAST. 10.1KG', precoSaco: 159.90, peso: 10.1, estoque: 12, code: '27', img: 'https://images.tcdn.com.br/img/img_prod/703632/racao_golden_gatos_castrados_frango_10_1kg_1899_1_20201015152857.jpg' },
-        { tipo: 'sacaria', nome: 'PREMIER CÃES ADULTOS 15KG', precoSaco: 239.90, peso: 15, estoque: 3, code: '2039', img: 'https://images.petz.com.br/fotos/1659987978007.jpg' },
-        { tipo: 'granel', nome: 'BIFINHO CARNE (KG)', precoKg: 48.00, estoque: 25, code: '1010', img: 'https://images.petz.com.br/fotos/1632766348399.jpg' }
-    ],
-    config: { name: "PETSHOP PRO MASTER", logo: "" },
-    tab: 'sacaria'
-};
-
-function save(){ localStorage.setItem("petshop_master_v14_final", JSON.stringify(db)); }
-
-function load(){
-    const data = JSON.parse(localStorage.getItem("petshop_master_v14_final"));
-    if(data) db = data;
-    document.getElementById('shopTitle').innerText = db.config.name;
-    document.getElementById('cfgName').value = db.config.name;
-    if(db.config.logo) document.getElementById('mainLogo').src = db.config.logo;
-    switchTab(db.tab);
+    reader.readAsText(file);
 }
 
 function switchTab(t){
@@ -793,225 +389,3 @@ load();
 </body>
 </html>
 
-<div id="modalItem" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h2 id="mTitle" style="text-align:center; color:var(--primary); margin-top:0">Produto</h2>
-        
-        <label>Foto do Produto (Toque para tirar foto ou galeria)</label>
-        <div class="preview-img-box" onclick="document.getElementById('inImg').click()">
-            <img id="imgPrev" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E">
-            <span>📷 ALTERAR FOTO</span>
-        </div>
-        <input type="file" id="inImg" class="hidden" accept="image/*" onchange="previewProdImg(this)">
-
-        <label>Nome do Produto</label>
-        <input id="inNome" placeholder="Ex: RAÇÃO GOLDEN GATOS 10KG">
-
-        <div id="boxSacaria">
-            <div style="display:flex; gap:12px">
-                <div style="flex:1">
-                    <label>Preço Saco (R$)</label>
-                    <input id="inPrecoSaco" type="number" step="0.01">
-                </div>
-                <div style="flex:1">
-                    <label>Peso (KG)</label>
-                    <input id="inPeso" type="number">
-                </div>
-            </div>
-            <label>Código de Barras</label>
-            <div style="display:flex; gap:10px">
-                <input id="inCode" style="flex:1">
-                <button onclick="startScanner('input')" class="btn-icon">📷</button>
-            </div>
-        </div>
-
-        <div id="boxGranel" class="hidden">
-            <label>Preço por Quilo (R$)</label>
-            <input id="inPrecoKg" type="number" step="0.01">
-        </div>
-
-        <label>Quantidade em Estoque</label>
-        <input id="inEstoque" type="number">
-
-        <div style="display:flex; gap:12px; margin-top:30px">
-            <button class="btn btn-muted" onclick="closeM()" style="flex:1">CANCELAR</button>
-            <button id="btnConfirm" class="btn btn-primary" style="flex:1">SALVAR</button>
-        </div>
-    </div>
-</div>
-
-<div id="scanOverlay" class="modal-overlay hidden" style="z-index: 300;">
-    <div class="modal-content" style="text-align:center">
-        <h2 style="margin-top:0">ESCANEANDO...</h2>
-        <p style="font-size:14px; color:var(--primary)">Aproxime o código de barras da câmera</p>
-        <div id="reader"></div>
-        <button id="btnStopScan" class="btn btn-danger" onclick="stopScanner()" style="margin-top:25px">❌ CANCELAR E FECHAR CÂMERA</button>
-    </div>
-</div>
-
-<div id="modalReset" class="modal-overlay hidden">
-    <div class="modal-content" style="border-color: var(--danger);">
-        <h2 style="color:var(--danger); text-align:center; margin-top:0">APAGAR TUDO?</h2>
-        <p style="text-align:center">Para confirmar, digite a frase abaixo:</p>
-        <p style="text-align:center; font-weight:bold; color:white; background:#000; padding:15px; border-radius:15px; border:1px solid var(--danger)">APAGAR TUDO</p>
-        <input id="inResetConfirm" placeholder="Digite aqui..." style="text-align:center; border: 2px solid var(--danger);">
-        <div style="display:flex; gap:12px; margin-top:25px">
-            <button class="btn btn-muted" style="flex:1" onclick="document.getElementById('modalReset').classList.add('hidden')">VOLTAR</button>
-            <button class="btn btn-danger" style="flex:1" onclick="confirmReset()">CONFIRMAR EXCLUSÃO</button>
-        </div>
-    </div>
-</div>
-
-<button id="fabAdd" class="fab" onclick="openModal()">+</button>
-
-<script>
-let db = {
-    items: [
-        { tipo: 'sacaria', nome: 'GOLDEN GATOS CAST. 10.1KG', precoSaco: 159.90, peso: 10.1, estoque: 12, code: '7896048202209', img: 'https://images.tcdn.com.br/img/img_prod/703632/racao_golden_gatos_castrados_frango_10_1kg_1899_1_20201015152857.jpg' },
-        { tipo: 'sacaria', nome: 'PREMIER CÃES ADULTOS 15KG', precoSaco: 239.90, peso: 15, estoque: 3, code: '7896048200113', img: 'https://images.petz.com.br/fotos/1659987978007.jpg' },
-        { tipo: 'granel', nome: 'BIFINHO CARNE (KG)', precoKg: 48.00, estoque: 25, img: 'https://images.petz.com.br/fotos/1632766348399.jpg' }
-    ],
-    config: { name: "PETSHOP PRO MASTER", logo: "" },
-    tab: 'sacaria'
-};
-
-function save(){ localStorage.setItem("petshop_master_final_v10", JSON.stringify(db)); }
-
-function load(){
-    const data = JSON.parse(localStorage.getItem("petshop_master_final_v10"));
-    if(data) db = data;
-    document.getElementById('shopTitle').innerText = db.config.name;
-    document.getElementById('cfgName').value = db.config.name;
-    if(db.config.logo) document.getElementById('mainLogo').src = db.config.logo;
-    switchTab(db.tab);
-}
-
-function switchTab(t){
-    db.tab = t;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('active');
-    document.getElementById('camSearchBtn').classList.toggle('hidden', t === 'granel');
-    render();
-}
-
-function render(){
-    const list = document.getElementById('itemList');
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    list.innerHTML = "";
-    const filtered = db.items.filter(i => i.tipo === db.tab && i.nome.toLowerCase().includes(search));
-    filtered.forEach((item) => {
-        const preco = item.tipo === 'sacaria' ? item.precoSaco : item.precoKg;
-        list.innerHTML += `<div class="card" onclick="openModal(${db.items.indexOf(item)})"><div class="info"><img src="${item.img || ''}" class="prod-img"><div class="info-text"><b>${item.nome}</b><small>${item.tipo === 'sacaria' ? item.peso+'kg' : 'Preço por Kg'} | Est: ${item.estoque}</small></div></div><div class="price-tag"><span class="price-val">R$ ${parseFloat(preco).toFixed(2)}</span></div></div>`;
-    });
-}
-
-function showScreen(id){
-    ['viewHome', 'viewSettings', 'viewReports', 'mainTabs', 'fabAdd'].forEach(s => document.getElementById(s).classList.add('hidden'));
-    if(id === 'home') { ['viewHome','mainTabs','fabAdd'].forEach(s => document.getElementById(s).classList.remove('hidden')); render(); }
-    else if(id === 'settings') document.getElementById('viewSettings').classList.remove('hidden');
-    else if(id === 'reports') { document.getElementById('viewReports').classList.remove('hidden'); renderReports(); }
-}
-
-function renderReports(){
-    const statsBox = document.getElementById('statsVisual');
-    const lowBox = document.getElementById('lowStockList');
-    let total = db.items.reduce((acc, i) => acc + ( (i.tipo === 'sacaria' ? i.precoSaco : i.precoKg) * i.estoque ), 0);
-    document.getElementById('totalCapital').innerText = `R$ ${total.toFixed(2)}`;
-    const sorted = [...db.items].sort((a,b) => b.estoque - a.estoque).slice(0, 3);
-    const maxVal = sorted[0]?.estoque || 1;
-    statsBox.innerHTML = sorted.map(i => `<div style="margin-bottom:15px"><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold"><span>${i.nome}</span><span style="color:var(--primary)">${i.estoque} Un/Kg</span></div><div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${(i.estoque/maxVal)*100}%"></div></div></div>`).join('');
-    const low = db.items.filter(i => i.estoque <= 3);
-    lowBox.innerHTML = low.length ? "" : "<p style='text-align:center; color:gray'>Estoque OK.</p>";
-    low.forEach(i => { lowBox.innerHTML += `<div class="card" style="border-color:var(--danger)"><span>${i.nome}</span> <b style="color:var(--danger)">${i.estoque} RESTANTES</b></div>`; });
-}
-
-let scanner;
-function startScanner(target) {
-    document.getElementById('scanOverlay').classList.remove('hidden');
-    scanner = new Html5Qrcode("reader");
-    const config = { fps: 15, qrbox: { width: 250, height: 250 } };
-    scanner.start({ facingMode: "environment" }, config, (txt) => {
-        if(target === 'search') document.getElementById('searchInput').value = txt;
-        else document.getElementById('inCode').value = txt;
-        stopScanner();
-        render();
-    }).catch(err => { stopScanner(); });
-}
-
-function stopScanner(){
-    const btn = document.getElementById('btnStopScan');
-    btn.innerText = "DESLIGANDO CÂMERA...";
-    btn.disabled = true;
-    if(scanner) {
-        scanner.stop().then(() => {
-            scanner.clear();
-            document.getElementById('scanOverlay').classList.add('hidden');
-            btn.innerText = "❌ CANCELAR E FECHAR CÂMERA";
-            btn.disabled = false;
-        }).catch(() => {
-            document.getElementById('scanOverlay').classList.add('hidden');
-            btn.innerText = "❌ CANCELAR E FECHAR CÂMERA";
-            btn.disabled = false;
-        });
-    } else { document.getElementById('scanOverlay').classList.add('hidden'); }
-}
-
-function previewProdImg(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => document.getElementById('imgPrev').src = e.target.result;
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function updateShopLogo(input) {
-    if (input.files && input.files[0]) {
-        let r = new FileReader();
-        r.onload = e => { 
-            db.config.logo = e.target.result; 
-            document.getElementById('mainLogo').src = e.target.result; 
-            save(); 
-        };
-        r.readAsDataURL(input.files[0]);
-    }
-}
-
-function openModal(idx = null){
-    const item = idx !== null ? db.items[idx] : { nome:"", precoSaco:"", peso:"", precoKg:"", estoque:"", code:"", tipo: db.tab, img:"" };
-    document.getElementById('inNome').value = item.nome;
-    document.getElementById('inPrecoSaco').value = item.precoSaco;
-    document.getElementById('inPeso').value = item.peso;
-    document.getElementById('inPrecoKg').value = item.precoKg;
-    document.getElementById('inEstoque').value = item.estoque;
-    document.getElementById('inCode').value = item.code || "";
-    document.getElementById('imgPrev').src = item.img || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E";
-    
-    document.getElementById('boxSacaria').classList.toggle('hidden', db.tab !== 'sacaria');
-    document.getElementById('boxGranel').classList.toggle('hidden', db.tab !== 'granel');
-    document.getElementById('modalItem').classList.remove('hidden');
-
-    document.getElementById('btnConfirm').onclick = () => {
-        const n = { 
-            tipo: db.tab, 
-            nome: document.getElementById('inNome').value.toUpperCase(), 
-            precoSaco: Number(document.getElementById('inPrecoSaco').value), 
-            peso: Number(document.getElementById('inPeso').value), 
-            precoKg: Number(document.getElementById('inPrecoKg').value), 
-            estoque: Number(document.getElementById('inEstoque').value), 
-            code: document.getElementById('inCode').value, 
-            img: document.getElementById('imgPrev').src 
-        };
-        if(idx !== null) db.items[idx] = n; else db.items.push(n);
-        save(); render(); closeM();
-    };
-}
-
-function closeM(){ document.getElementById('modalItem').classList.add('hidden'); }
-function saveCfg(){ db.config.name = document.getElementById('cfgName').value.toUpperCase(); save(); showScreen('home'); }
-function openResetModal(){ document.getElementById('modalReset').classList.remove('hidden'); }
-function confirmReset(){ if(document.getElementById('inResetConfirm').value === "APAGAR TUDO") { localStorage.clear(); location.reload(); } }
-
-load();
-</script>
-</body>
-</html>
